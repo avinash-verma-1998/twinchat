@@ -1,121 +1,139 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [messages, setMessages] = useState<Array<{
+    id: number | string
+    text: string
+    user: boolean
+    createdAt: Date
+  }>>([])
+  const [inputValue, setInputValue] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Add a welcome message when the component mounts
+  useEffect(() => {
+    setMessages([
+      {
+        id: 1,
+        text: 'Hello! How can I assist you today?',
+        user: false,
+        createdAt: new Date()
+      }
+    ])
+  }, [])
+
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim()) return
+
+    // Add user message to the list
+    const userMessage = {
+      id: Date.now(),
+      text: text,
+      user: true,
+      createdAt: new Date()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+    setInputValue('')
+    setIsLoading(true)
+
+    try {
+      // Prepare the history for the API (excluding the current message we just added)
+      const history = messages.map(msg => ({
+        role: msg.user ? 'user' : 'assistant',
+        content: msg.text
+      }))
+
+      // Call the API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: text,
+          history: history
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const botResponse = data.response || 'Sorry, I encountered an error.'
+
+      // Add bot response to the list
+      const botMessage = {
+        id: Date.now() + 1,
+        text: botResponse,
+        user: false,
+        createdAt: new Date()
+      }
+      
+      setMessages(prev => [...prev, botMessage])
+    } catch (error) {
+      console.error('Error:', error)
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: 'Sorry, there was an error processing your request.',
+        user: false,
+        createdAt: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app-container">
+      <div className="chat-container">
+        <div className="message-list">
+          {messages.map((message, index) => (
+            <div 
+              key={index} 
+              className={`message ${message.user ? 'user-message' : 'bot-message'}`}
+            >
+              <div className="message-text">
+                {/* Simple markdown rendering - in a real app you'd use a markdown library */}
+                {message.text.split('\n').map((line, lineIndex) => (
+                  <div key={lineIndex} className="message-line">
+                    {line}
+                  </div>
+                ))}
+              </div>
+              <div className="message-time">
+                {message.createdAt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              </div>
+            </div>
+          ))}
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+        <div className="input-container">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !isLoading) {
+                handleSendMessage(inputValue)
+              }
+            }}
+            disabled={isLoading}
+            placeholder="Type a message..."
+            className="message-input"
+          />
+          <button
+            onClick={() => !isLoading && handleSendMessage(inputValue)}
+            disabled={isLoading || !inputValue.trim()}
+            className="send-button"
+          >
+            {isLoading ? 'Sending...' : 'Send'}
+          </button>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </div>
   )
 }
 
